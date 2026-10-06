@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SNS 후기 레이더</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+  /* Layout: 왼쪽 고정 조작 패널 + 오른쪽 키워드별 채널 카드, 폰에서는 한 줄로 쌓임 */
+  :root {
+    --bg: #F5F3F0; --surface: #FFFFFF; --sunk: #ECE8E3; --seen: #E9E4DE;
+    --ink: #1F1A17; --muted: #6B625C; --line: #E0D9D2;
+    --accent: #D9480F; --accent-ink: #FFFFFF; --accent-soft: #FCE6DA;
+    --pos: #2B7637; --pos-soft: #E1F0E3;
+    --neg: #B8213A; --neg-soft: #FAE1E5;
+    --warn: #8F5400; --warn-soft: #FBEFD5;
+    --display: "Black Han Sans", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161311; --surface: #201C19; --sunk: #2B2622; --seen: #2E2824;
+      --ink: #F1EBE6; --muted: #A69B93; --line: #3A332E;
+      --accent: #FF7B3D; --accent-ink: #1B0D05; --accent-soft: #3B2317;
+      --pos: #78CC83; --pos-soft: #1C3121;
+      --neg: #FF7488; --neg-soft: #3A1D23;
+      --warn: #F2B455; --warn-soft: #3A2D14;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161311; --surface: #201C19; --sunk: #2B2622; --seen: #2E2824;
+    --ink: #F1EBE6; --muted: #A69B93; --line: #3A332E;
+    --accent: #FF7B3D; --accent-ink: #1B0D05; --accent-soft: #3B2317;
+    --pos: #78CC83; --pos-soft: #1C3121;
+    --neg: #FF7488; --neg-soft: #3A1D23;
+    --warn: #F2B455; --warn-soft: #3A2D14;
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button { font: inherit; }
+
+  .wrap { max-width: 1200px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 56px; }
+
+  .top { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 20px; margin-bottom: 22px; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: clamp(1.8rem, 4.5vw, 2.4rem); line-height: 1.1; margin: 0; letter-spacing: .01em; }
+  h1 .mark { color: var(--accent); }
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; text-wrap: pretty; }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  main { min-width: 0; }
+  @media (min-width: 900px) {
+    .layout { grid-template-columns: 300px minmax(0, 1fr); }
+    .panel { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; max-height: calc(100vh - 32px); overflow: auto; }
+  }
+
+  /* 조작 패널 */
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 20px; }
+  .panel section { display: flex; flex-direction: column; gap: 8px; }
+  .field-label { font-size: .76rem; font-weight: 700; letter-spacing: .08em; color: var(--muted); margin: 0; }
+  .hint, .note { font-size: .8rem; color: var(--muted); margin: 0; }
+  .note { color: var(--warn); }
+
+  input[type="date"], input[type="text"], select, textarea {
+    font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; min-width: 0; width: 100%;
+  }
+  input[type="date"] { font-family: var(--mono); font-size: .9rem; }
+  .dates { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: center; }
+  .tilde { color: var(--muted); }
+
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill { font-size: .84rem; border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 999px; padding: 4px 11px; cursor: pointer; }
+  .pill:hover { border-color: var(--muted); }
+  .pill[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .btn { font-weight: 700; border: 1px solid transparent; border-radius: 8px; padding: 8px 14px; cursor: pointer; background: var(--accent); color: var(--accent-ink); white-space: nowrap; }
+  .btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); font-weight: 500; }
+  .btn.ghost:hover { border-color: var(--muted); }
+  .btn.sm { padding: 5px 10px; font-size: .84rem; }
+  .btn.invert { background: var(--bg); color: var(--ink); }
+
+  .kw-add { display: flex; gap: 6px; margin: 0; }
+  .kw-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .kw { display: inline-flex; align-items: center; gap: 2px; background: var(--accent-soft); color: var(--ink); border-radius: 999px; padding: 3px 4px 3px 12px; font-weight: 500; }
+  .kw button { border: 0; background: transparent; color: var(--muted); font-size: 1.05rem; line-height: 1; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; }
+  .kw button:hover { color: var(--neg); }
+
+  .seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--sunk); border-radius: 9px; padding: 3px; }
+  .seg button { border: 0; background: transparent; padding: 7px; border-radius: 7px; cursor: pointer; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: 0 1px 2px rgb(0 0 0 / .14); }
+
+  .check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+  .check input { margin-top: 4px; accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
+  .check small { display: block; color: var(--muted); font-size: .8rem; }
+
+  details { border-top: 1px solid var(--line); padding-top: 12px; }
+  details + details { margin-top: -8px; }
+  summary { cursor: pointer; font-weight: 700; font-size: .9rem; }
+  .channel-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-top: 10px; font-size: .88rem; }
+  .channel-list label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .channel-list input { accent-color: var(--accent); }
+  .words { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; align-items: center; margin-top: 10px; font-size: .88rem; }
+  .words .hint { grid-column: 1 / -1; }
+
+  /* 요약 바 */
+  .summary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 18px; border-radius: 14px; background: var(--ink); color: var(--bg); }
+  .summary .date { font-family: var(--mono); font-size: 1.15rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .summary .meta { font-size: .85rem; opacity: .78; }
+  .summary .btn { margin-left: auto; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: .8rem; color: var(--muted); }
+  .legend .lg { display: inline-flex; gap: 6px; align-items: center; }
+
+  /* 키워드 카드 */
+  .cards { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .card-head h2 { font-family: var(--display); font-weight: 400; font-size: 1.55rem; line-height: 1.2; margin: 0; overflow-wrap: anywhere; }
+  .card-head .range { font-family: var(--mono); font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .card-head .btn { margin-left: auto; align-self: center; }
+
+  .group h3, .react h3 { font-size: .76rem; font-weight: 700; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+  .group h3 small, .react h3 small { font-weight: 400; letter-spacing: 0; font-size: .78rem; }
+  .links { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .plink { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; text-decoration: none; color: var(--ink); background-color: var(--surface); transition: border-color .15s; min-width: 0; }
+  .plink:hover { border-color: var(--accent); }
+  .plink:visited { background-color: var(--seen); }
+  .pname { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .92rem; line-height: 1.3; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dot, var(--muted)); flex: none; }
+  .badge { font-size: .72rem; align-self: flex-start; padding: 1px 8px; border-radius: 999px; font-weight: 500; white-space: nowrap; }
+  .badge.exact { background: var(--pos-soft); color: var(--pos); }
+  .badge.approx { background: var(--warn-soft); color: var(--warn); }
+  .badge.none { background: var(--sunk); color: var(--muted); }
+
+  .react { border-top: 1px dashed var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .react h3 { margin-bottom: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chip-lbl { font-size: .74rem; font-weight: 700; color: var(--muted); width: 2.6em; flex: none; }
+  .chip { font-size: .88rem; text-decoration: none; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
+  .chip:hover { border-color: var(--muted); }
+  .chip.pos { background: var(--pos-soft); border-color: transparent; color: var(--pos); }
+  .chip.neg { background: var(--neg-soft); border-color: transparent; color: var(--neg); }
+  .chip.pos:hover, .chip.neg:hover { border-color: currentColor; }
+
+  .empty { border: 1px dashed var(--line); border-radius: 14px; padding: 26px 22px; color: var(--muted); }
+  .empty b { color: var(--ink); display: block; margin-bottom: 4px; }
+  .empty p { margin: 0; }
+
+  .tips { margin-top: 32px; max-width: 72ch; }
+  .tips h2 { font-size: 1rem; margin: 0 0 10px; }
+  .tips ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; color: var(--muted); }
+  .tips b { color: var(--ink); font-weight: 700; }
+
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgb(0 0 0 / .18); padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; }
+  .sheet p { margin: 0; font-weight: 700; }
+  .sheet textarea { height: 170px; font-family: var(--mono); font-size: .78rem; resize: vertical; }
+  .sheet .btn { align-self: flex-end; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <h1>SNS 후기 <span class="mark">레이더</span></h1>
+    <p class="lede">날짜와 키워드를 넣으면 네이버·다음·인스타그램·X·유튜브 검색 결과를 그 기간으로 걸러서 바로 열어 줍니다. 서버도 API 키도 쓰지 않아서 비용이 들지 않아요.</p>
+  </header>
+
+  <div class="layout">
+    <aside class="panel" aria-label="검색 조건">
+      <section>
+        <h2 class="field-label">기간</h2>
+        <div class="dates">
+          <input type="date" id="start" aria-label="시작일">
+          <span class="tilde" aria-hidden="true">~</span>
+          <input type="date" id="end" aria-label="종료일">
+        </div>
+        <div class="presets" id="presets">
+          <button class="pill" type="button" data-preset="today">오늘</button>
+          <button class="pill" type="button" data-preset="yesterday">어제</button>
+          <button class="pill" type="button" data-preset="3">최근 3일</button>
+          <button class="pill" type="button" data-preset="7">최근 7일</button>
+          <button class="pill" type="button" data-preset="30">최근 30일</button>
+        </div>
+        <p class="note" id="dateNote" hidden>시작일이 종료일보다 늦어서 두 날짜를 바꿨어요.</p>
+      </section>
+
+      <section>
+        <h2 class="field-label"><label for="kwInput">키워드</label></h2>
+        <form class="kw-add" id="kwForm">
+          <input type="text" id="kwInput" placeholder="예: 한강엽떡" autocomplete="off" enterkeyhint="done">
+          <button class="btn" type="submit">추가</button>
+        </form>
+        <p class="hint">쉼표로 여러 개를 한 번에 넣을 수 있어요.</p>
+        <div class="kw-list" id="kwList"></div>
+      </section>
+
+      <section>
+        <h2 class="field-label">정렬</h2>
+        <div class="seg" id="sortSeg">
+          <button type="button" data-sort="recent">최신순</button>
+          <button type="button" data-sort="relevance">관련도순</button>
+        </div>
+      </section>
+
+      <section>
+        <label class="check"><input type="checkbox" id="excludeAds"><span><b>체험단·협찬 글 빼기</b><small>검색어에 -협찬 -원고료 -제공받아 -체험단을 붙여서 실제 소비자 글 위주로 봅니다.</small></span></label>
+      </section>
+
+      <section>
+        <h2 class="field-label"><label for="reactTarget">반응어 검색할 곳</label></h2>
+        <select id="reactTarget"></select>
+      </section>
+
+      <details>
+        <summary>채널 켜고 끄기</summary>
+        <div class="channel-list" id="channelList"></div>
+      </details>
+      <details>
+        <summary>반응어 고치기</summary>
+        <div class="words">
+          <label for="wNeutral">후기</label><input id="wNeutral" type="text">
+          <label for="wPos">긍정</label><input id="wPos" type="text">
+          <label for="wNeg">부정</label><input id="wNeg" type="text">
+          <p class="hint">쉼표로 구분해요. 바꾼 내용은 이 브라우저에 저장됩니다.</p>
+        </div>
+      </details>
+    </aside>
+
+    <main>
+      <div class="summary">
+        <div>
+          <div class="date" id="sumDate"></div>
+          <div class="meta" id="sumMeta"></div>
+        </div>
+        <button class="btn invert" type="button" id="copyAll">전체 링크 복사</button>
+      </div>
+      <div class="legend">
+        <span class="lg"><span class="badge exact">기간 적용</span>선택한 기간의 글만</span>
+        <span class="lg"><span class="badge approx">기간 근사</span>검색엔진 추정 날짜라 하루쯤 어긋날 수 있음</span>
+        <span class="lg"><span class="badge none">날짜 없음</span>날짜 검색 미지원, 최신 글부터 확인</span>
+      </div>
+
+      <div class="cards" id="cards"></div>
+
+      <section class="tips">
+        <h2>모니터링할 때 알아두면 좋은 점</h2>
+        <ul>
+          <li><b>후기는 네이버 블로그·카페에 가장 많이 쌓여요.</b> 날짜도 정확히 걸려서 매일 확인하기 좋아요.</li>
+          <li><b>소비자 반응은 반응어 칩으로 빠르게 훑어보세요.</b> ‘별로’, ‘실망’ 같은 부정어 검색 결과가 갑자기 늘면 이슈가 생긴 신호예요.</li>
+          <li><b>인스타그램은 날짜로 검색할 수 없어요.</b> #태그 링크로 들어가 최신 글을 직접 보거나, ‘인스타 (구글 경유)’로 구글에 잡힌 게시물만 기간을 걸어 볼 수 있어요.</li>
+          <li><b>X·인스타그램·스레드·틱톡은 로그인해야</b> 결과가 제대로 보여요.</li>
+          <li><b>협찬 거르기는 완벽하지 않아요.</b> 협찬 표시를 이미지로만 넣은 글은 걸러지지 않아요.</li>
+          <li>한 번 연 링크는 카드 바탕이 살짝 어두워져서 어디까지 확인했는지 알 수 있어요.</li>
+          <li>링크를 눌렀는데 기간 없이 열리면 그 사이트가 검색 주소 형식을 바꾼 경우예요. 그 채널만 다시 맞추면 됩니다.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <p>자동 복사가 막혀 있어요. 아래 내용을 전체 선택해서 복사하세요.</p>
+  <textarea id="sheetText" readonly aria-label="복사할 링크"></textarea>
+  <button class="btn ghost" type="button" id="sheetClose">닫기</button>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const enc = encodeURIComponent;
+  const pad = n => String(n).padStart(2, '0');
+  const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return fmt(d); };
+  const today = () => fmt(new Date());
+  const ymd = s => s.replace(/-/g, '');
+  const dotted = s => s.replace(/-/g, '.');
+  const mdy = s => { const d = parse(s); return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`; };
+  const WEEK = '일월화수목금토';
+  const dayLabel = s => `${dotted(s)} (${WEEK[parse(s).getDay()]})`;
+  const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+  // 사이트별 검색 주소 (날짜는 모두 YYYY-MM-DD 문자열로 받음)
+  const naverNso = c => enc(`so:${c.sort === 'recent' ? 'dd' : 'r'},p:from${ymd(c.start)}to${ymd(c.end)}`);
+  const naverUrl = (tab, q, c) => `https://search.naver.com/search.naver?ssc=tab.${tab}.all&sm=tab_opt&query=${enc(q)}&nso=${naverNso(c)}`;
+  const daumUrl = (w, q, c) => `https://search.daum.net/search?w=${w}&q=${enc(q)}&sort=${c.sort === 'recent' ? 'recency' : 'accuracy'}&period=u&sd=${ymd(c.start)}000000&ed=${ymd(c.end)}235959`;
+  const googleUrl = (q, c) => `https://www.google.com/search?q=${enc(q)}&tbs=${enc(`cdr:1,cd_min:${mdy(c.start)},cd_max:${mdy(c.end)}`)}`;
+  const COMMUNITIES = ['theqoo.net', 'instiz.net', 'pann.nate.com', 'dcinside.com', 'fmkorea.com'];
+
+  const PLATFORMS = [
+    { id: 'nblog', group: 'review', name: '네이버 블로그', color: '#03C75A', date: 'exact', minus: true,
+      url: (q, c) => naverUrl('blog', q, c) },
+    { id: 'ncafe', group: 'review', name: '네이버 카페', color: '#03C75A', date: 'exact', minus: true,
+      url: (q, c) => naverUrl('cafe', q, c) },
+    { id: 'dblog', group: 'review', name: '다음 블로그·티스토리', color: '#3D7BF7', date: 'exact', minus: true,
+      url: (q, c) => daumUrl('blog', q, c) },
+    { id: 'dcafe', group: 'review', name: '다음 카페', color: '#3D7BF7', date: 'exact', minus: true,
+      url: (q, c) => daumUrl('cafe', q, c) },
+    { id: 'insta', group: 'sns', name: '인스타그램 #태그', color: '#E1306C', date: 'none', minus: false,
+      url: (q, c, kw) => `https://www.instagram.com/explore/tags/${enc(kw.replace(/[\s#"']/g, ''))}/` },
+    { id: 'instag', group: 'sns', name: '인스타 (구글 경유)', color: '#E1306C', date: 'approx', minus: true,
+      url: (q, c) => googleUrl(`site:instagram.com ${q}`, c) },
+    { id: 'x', group: 'sns', name: 'X (트위터)', color: 'var(--ink)', date: 'exact', minus: true,
+      url: (q, c) => `https://x.com/search?q=${enc(`${q} since:${c.start} until:${addDays(c.end, 1)}`)}&src=typed_query&f=${c.sort === 'recent' ? 'live' : 'top'}` },
+    { id: 'threads', group: 'sns', name: '스레드', color: 'var(--ink)', date: 'none', minus: false,
+      url: (q, c) => `https://www.threads.com/search?q=${enc(q)}&serp_type=default${c.sort === 'recent' ? '&filter=recent' : ''}` },
+    { id: 'youtube', group: 'sns', name: '유튜브', color: '#FF0033', date: 'approx', minus: true,
+      url: (q, c) => `https://www.youtube.com/results?search_query=${enc(`${q} after:${addDays(c.start, -1)} before:${addDays(c.end, 1)}`)}` },
+    { id: 'tiktok', group: 'sns', name: '틱톡', color: '#25C4D0', date: 'none', minus: false,
+      url: q => `https://www.tiktok.com/search?q=${enc(q)}` },
+    { id: 'google', group: 'web', name: '구글 전체', color: '#4285F4', date: 'approx', minus: true,
+      url: (q, c) => googleUrl(q, c) },
+    { id: 'community', group: 'web', name: '커뮤니티 (더쿠·인스티즈 등)', color: '#7B61FF', date: 'approx', minus: true,
+      url: (q, c) => googleUrl(`${q} (${COMMUNITIES.map(d => 'site:' + d).join(' OR ')})`, c) },
+    { id: 'nnews', group: 'web', name: '네이버 뉴스', color: '#03C75A', date: 'exact', minus: false,
+      url: (q, c) => `https://search.naver.com/search.naver?where=news&sm=tab_opt&query=${enc(q)}&sort=${c.sort === 'recent' ? 1 : 0}&pd=3&ds=${dotted(c.start)}&de=${dotted(c.end)}&nso=${naverNso(c)}` },
+  ];
+  const GROUPS = [
+    { id: 'review', name: '블로그·카페', sub: '후기가 가장 많이 쌓이는 곳' },
+    { id: 'sns', name: 'SNS·영상', sub: '로그인해야 잘 보이는 곳이 많아요' },
+    { id: 'web', name: '웹·커뮤니티·뉴스', sub: '커뮤니티 반응과 기사' },
+  ];
+  const DATE_BADGE = {
+    exact: ['기간 적용', '선택한 기간에 쓰인 글만 보여줘요'],
+    approx: ['기간 근사', '검색엔진이 추정한 날짜 기준이라 하루쯤 어긋날 수 있어요'],
+    none: ['날짜 없음', '날짜 검색을 지원하지 않아요. 최신 글부터 확인하세요'],
+  };
+  const REACT_TARGETS = ['nblog', 'ncafe', 'dblog', 'x', 'community', 'google', 'youtube'];
+  const ADS = ['협찬', '원고료', '제공받아', '체험단'];
+
+  // 상태 (키워드·옵션은 이 브라우저에 저장, 날짜는 매번 오늘로 시작)
+  const STORE = 'review-radar.v1';
+  const DEFAULTS = {
+    keywords: ['한강엽떡', '밤티엽떡'],
+    sort: 'recent',
+    excludeAds: false,
+    reactTarget: 'nblog',
+    hidden: [],
+    words: { neutral: '후기, 리뷰, 내돈내산', pos: '맛있다, 존맛, 재구매, 추천', neg: '별로, 실망, 비추, 아쉽다' },
+  };
+  function load() {
+    const base = JSON.parse(JSON.stringify(DEFAULTS));
+    try {
+      const raw = localStorage.getItem(STORE);
+      if (raw) {
+        const s = JSON.parse(raw);
+        return { ...base, ...s, words: { ...base.words, ...(s.words || {}) } };
+      }
+    } catch (e) { /* 저장소를 못 쓰는 환경이면 기본값 사용 */ }
+    return base;
+  }
+  function save() {
+    try {
+      const { keywords, sort, excludeAds, reactTarget, hidden, words } = state;
+      localStorage.setItem(STORE, JSON.stringify({ keywords, sort, excludeAds, reactTarget, hidden, words }));
+    } catch (e) { /* 무시 */ }
+  }
+  const state = load();
+  state.start = today();
+  state.end = today();
+
+  const ctx = () => ({ start: state.start, end: state.end, sort: state.sort });
+  const visible = () => PLATFORMS.filter(p => !state.hidden.includes(p.id));
+  const words = key => state.words[key].split(',').map(w => w.trim()).filter(Boolean);
+  const dayCount = () => Math.round((parse(state.end) - parse(state.start)) / 864e5) + 1;
+  const rangeLabel = () => state.start === state.end ? dayLabel(state.start) : `${dayLabel(state.start)} ~ ${dayLabel(state.end)}`;
+  const sortLabel = () => state.sort === 'recent' ? '최신순' : '관련도순';
+
+  function query(kw, p, extra) {
+    let q = extra ? `${kw} ${extra}` : kw;
+    if (state.excludeAds && p.minus) q += ' ' + ADS.map(w => '-' + w).join(' ');
+    return q;
+  }
+  const linkFor = (kw, p, extra) => p.url(query(kw, p, extra), ctx(), kw);
+
+  // 패널
+  function activePreset() {
+    const t = today();
+    if (state.start === state.end && state.start === addDays(t, -1)) return 'yesterday';
+    if (state.end !== t) return null;
+    if (state.start === t) return 'today';
+    for (const n of [3, 7, 30]) if (state.start === addDays(t, -(n - 1))) return String(n);
+    return null;
+  }
+  function renderPanel() {
+    $('#start').value = state.start;
+    $('#end').value = state.end;
+    const ap = activePreset();
+    document.querySelectorAll('#presets .pill').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.preset === ap)));
+    $('#kwList').innerHTML = state.keywords.map((k, i) =>
+      `<span class="kw">${esc(k)}<button type="button" data-remove="${i}" aria-label="${esc(k)} 삭제">×</button></span>`).join('');
+    document.querySelectorAll('#sortSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sort === state.sort)));
+    $('#excludeAds').checked = state.excludeAds;
+    $('#reactTarget').innerHTML = REACT_TARGETS.map(id => {
+      const p = PLATFORMS.find(x => x.id === id);
+      return `<option value="${id}"${id === state.reactTarget ? ' selected' : ''}>${esc(p.name)}</option>`;
+    }).join('');
+    $('#channelList').innerHTML = PLATFORMS.map(p =>
+      `<label><input type="checkbox" data-channel="${p.id}"${state.hidden.includes(p.id) ? '' : ' checked'}>${esc(p.name)}</label>`).join('');
+  }
+
+  // 카드
+  function linkHtml(kw, p) {
+    const [badge, tip] = DATE_BADGE[p.date];
+    return `<a class="plink" href="${esc(linkFor(kw, p))}" target="_blank" rel="noopener noreferrer" title="${esc(tip)}" style="--dot:${p.color}">
+      <span class="pname"><span class="dot"></span>${esc(p.name)}</span><span class="badge ${p.date}">${badge}</span></a>`;
+  }
+  function chipRow(label, key, kw, target) {
+    const ws = words(key);
+    if (!ws.length) return '';
+    return `<div class="chips"><span class="chip-lbl">${label}</span>${ws.map(w =>
+      `<a class="chip ${key}" href="${esc(linkFor(kw, target, w))}" target="_blank" rel="noopener noreferrer">${esc(w)}</a>`).join('')}</div>`;
+  }
+  function renderCards() {
+    const vis = visible();
+    const target = PLATFORMS.find(p => p.id === state.reactTarget) || PLATFORMS[0];
+    $('#sumDate').textContent = rangeLabel();
+    $('#sumMeta').textContent = `${dayCount()}일간 · 키워드 ${state.keywords.length}개 · 채널 ${vis.length}곳 · ${sortLabel()}${state.excludeAds ? ' · 협찬 제외' : ''}`;
+    $('#copyAll').hidden = !state.keywords.length;
+
+    const el = $('#cards');
+    if (!state.keywords.length) {
+      el.innerHTML = `<div class="empty"><b>아직 키워드가 없어요.</b><p>키워드 칸에 브랜드나 메뉴 이름을 넣으면 채널별 검색 링크가 여기에 만들어져요.</p></div>`;
+      return;
+    }
+    el.innerHTML = state.keywords.map((kw, i) => {
+      const groups = GROUPS.map(g => {
+        const ps = vis.filter(p => p.group === g.id);
+        if (!ps.length) return '';
+        return `<section class="group"><h3>${g.name}<small>${g.sub}</small></h3><div class="links">${ps.map(p => linkHtml(kw, p)).join('')}</div></section>`;
+      }).join('') || `<p class="hint">켜진 채널이 없어요. 왼쪽 ‘채널 켜고 끄기’에서 채널을 켜 주세요.</p>`;
+      return `<article class="card">
+        <header class="card-head">
+          <h2>${esc(kw)}</h2>
+          <span class="range">${esc(rangeLabel())}</span>
+          <button class="btn ghost sm" type="button" data-copy="${i}">링크 복사</button>
+        </header>
+        ${groups}
+        <section class="react">
+          <h3>반응어로 좁혀 보기<small>${esc(target.name)} · 같은 기간</small></h3>
+          ${chipRow('후기', 'neutral', kw, target)}${chipRow('긍정', 'pos', kw, target)}${chipRow('부정', 'neg', kw, target)}
+        </section>
+      </article>`;
+    }).join('');
+  }
+  function render() { renderPanel(); renderCards(); }
+
+  // 복사
+  const copyHeader = () => `[SNS 후기 레이더] ${rangeLabel()} · ${sortLabel()}${state.excludeAds ? ' · 협찬 제외' : ''}`;
+  const copyBlock = kw => [`■ ${kw}`, ...visible().map(p => `- ${p.name} [${DATE_BADGE[p.date][0]}]: ${linkFor(kw, p)}`)].join('\n');
+  function flash(btn, msg) {
+    const old = btn.textContent;
+    btn.textContent = msg;
+    setTimeout(() => { btn.textContent = old; }, 1500);
+  }
+  async function copyText(text, btn) {
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { /* 아래 방법으로 재시도 */ }
+    if (!ok) {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      ta.remove();
+    }
+    if (ok) { flash(btn, '복사됨'); return; }
+    $('#sheetText').value = text;
+    $('#sheet').hidden = false;
+    $('#sheetText').focus();
+    $('#sheetText').select();
+  }
+
+  // 이벤트
+  function setDates(s, e) {
+    if (!s || !e) { renderPanel(); return; }
+    const swapped = s > e;
+    state.start = swapped ? e : s;
+    state.end = swapped ? s : e;
+    $('#dateNote').hidden = !swapped;
+    render();
+  }
+  $('#start').addEventListener('change', e => setDates(e.target.value, state.end));
+  $('#end').addEventListener('change', e => setDates(state.start, e.target.value));
+  $('#presets').addEventListener('click', e => {
+    const b = e.target.closest('[data-preset]');
+    if (!b) return;
+    const t = today(), p = b.dataset.preset;
+    if (p === 'today') setDates(t, t);
+    else if (p === 'yesterday') setDates(addDays(t, -1), addDays(t, -1));
+    else setDates(addDays(t, -(Number(p) - 1)), t);
+  });
+  $('#kwForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const input = $('#kwInput');
+    const parts = input.value.split(/[,\n]/).map(s => s.trim().replace(/^#+/, '')).filter(Boolean);
+    for (const k of parts) if (!state.keywords.includes(k)) state.keywords.push(k);
+    input.value = '';
+    save(); render();
+    input.focus();
+  });
+  $('#kwList').addEventListener('click', e => {
+    const b = e.target.closest('[data-remove]');
+    if (!b) return;
+    state.keywords.splice(Number(b.dataset.remove), 1);
+    save(); render();
+  });
+  $('#sortSeg').addEventListener('click', e => {
+    const b = e.target.closest('[data-sort]');
+    if (!b) return;
+    state.sort = b.dataset.sort;
+    save(); render();
+  });
+  $('#excludeAds').addEventListener('change', e => { state.excludeAds = e.target.checked; save(); renderCards(); });
+  $('#reactTarget').addEventListener('change', e => { state.reactTarget = e.target.value; save(); renderCards(); });
+  $('#channelList').addEventListener('change', e => {
+    const id = e.target.dataset.channel;
+    if (!id) return;
+    state.hidden = e.target.checked ? state.hidden.filter(x => x !== id) : [...state.hidden, id];
+    save(); renderCards();
+  });
+  [['#wNeutral', 'neutral'], ['#wPos', 'pos'], ['#wNeg', 'neg']].forEach(([sel, key]) => {
+    const input = $(sel);
+    input.value = state.words[key];
+    input.addEventListener('input', () => { state.words[key] = input.value; save(); renderCards(); });
+  });
+  $('#cards').addEventListener('click', e => {
+    const b = e.target.closest('[data-copy]');
+    if (!b) return;
+    const kw = state.keywords[Number(b.dataset.copy)];
+    copyText(`${copyHeader()}\n${copyBlock(kw)}`, b);
+  });
+  $('#copyAll').addEventListener('click', e => {
+    copyText([copyHeader(), ...state.keywords.map(copyBlock)].join('\n\n'), e.currentTarget);
+  });
+  $('#sheetClose').addEventListener('click', () => { $('#sheet').hidden = true; });
+
+  render();
+})();
+</script>
+</body>
+</html>
