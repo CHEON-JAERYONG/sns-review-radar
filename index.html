@@ -256,26 +256,6 @@
   .mini.pos { background: var(--pos-soft); color: var(--pos); border-color: transparent; }
   .mini.neg { background: var(--neg-soft); color: var(--neg); border-color: transparent; }
 
-  /* 언급량 집계 */
-  .report-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-  .btn[disabled] { opacity: .6; cursor: default; }
-  .guide { margin: 0; padding-left: 1.3em; color: var(--muted); display: flex; flex-direction: column; gap: 7px; font-size: .9rem; }
-  .guide b { color: var(--ink); }
-  .guide a { color: var(--brand); }
-  .bars { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 10px; }
-  .barrow { display: grid; grid-template-columns: minmax(74px, 128px) minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: .86rem; }
-  .blab { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .btrack { background: var(--sunk); border-radius: 5px; height: 16px; overflow: hidden; }
-  .btrack i { display: block; height: 100%; border-radius: 0 4px 4px 0; min-width: 2px; }
-  .bval { font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: .84rem; }
-  .vlegend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .78rem; color: var(--muted); margin-top: 8px; }
-  .vlegend .lg { display: inline-flex; align-items: center; gap: 5px; }
-  .vlegend i { width: 9px; height: 9px; border-radius: 3px; display: block; }
-  .chart { margin: 18px 0 0; }
-  .chart figcaption { font-size: .78rem; letter-spacing: .07em; color: var(--muted); font-weight: 700; margin-bottom: 6px; }
-  .chart svg { width: 100%; height: 210px; overflow: visible; }
-  .chart .grid { stroke: var(--line); stroke-width: 1; }
-  .chart .ax { fill: var(--muted); font-size: 10px; font-family: var(--mono); }
 
   .empty { border: 1px dashed var(--line); border-radius: 16px; padding: 28px 22px; color: var(--muted); background: var(--surface); }
   .empty b { color: var(--ink); display: block; margin-bottom: 4px; }
@@ -307,7 +287,6 @@
       <button type="button" data-tab="dash">대시보드</button>
       <button type="button" data-tab="keywords">키워드 분석</button>
       <button type="button" data-tab="rivals">경쟁사 모니터링</button>
-      <button type="button" data-tab="trend">언급량 집계</button>
     </nav>
     <div class="nav-right">
       <button class="icon-btn" type="button" id="themeBtn" aria-label="밝게/어둡게 바꾸기" title="밝게/어둡게 바꾸기">
@@ -537,7 +516,6 @@
     radar: { title: 'SNS 후기 <span class="mark">레이더</span>', lede: '날짜와 키워드를 넣으면 네이버·다음·인스타그램·X·유튜브 검색 결과를 한 번에 모아 볼 수 있습니다. 서버도 API 키도 쓰지 않습니다.' },
     keywords: { title: '키워드 <span class="mark">분석</span>', lede: '같은 키워드를 반응어·관점별로 쪼개서, 소비자가 무엇을 좋아하고 무엇에 불만인지 갈라서 봅니다.' },
     rivals: { title: '경쟁사 <span class="mark">모니터링</span>', lede: '자사 브랜드와 경쟁 브랜드를 같은 기간·같은 채널 조건으로 나란히 놓고 확인합니다.' },
-    trend: { title: '언급량 <span class="mark">집계</span>', lede: '네이버 검색 API로 블로그·뉴스 글 수를 실제로 세어 날짜별 추이와 브랜드별 언급량을 보여 줍니다. 내 PC의 집계 서버를 켜야 동작합니다.' },
   };
 
   // 상태 (키워드·옵션은 이 브라우저에 저장, 날짜는 매번 오늘로 시작)
@@ -902,190 +880,11 @@
         <button class="chip" type="button" data-go="radar">SNS 후기 레이더 열기</button>
         <button class="chip" type="button" data-go="keywords">키워드 분석 열기</button>
         <button class="chip" type="button" data-go="rivals">경쟁사 모니터링 열기</button>
-        <button class="chip" type="button" data-go="trend">언급량 집계 열기</button>
       </div>
     </section>`;
   }
 
-  // ---------- 언급량 집계 (로컬 수집기 + 네이버 검색 API) ----------
-  const COLLECTOR = 'http://127.0.0.1:8787';
-  const SERIES_LIGHT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
-  const SERIES_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
-  const isDark = () => (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
-  const series = i => (isDark() ? SERIES_DARK : SERIES_LIGHT)[i % 8];
-  const trend = { status: 'unknown', rows: null, running: false, error: '', at: '', sig: '' };
-  const trendSig = () => [state.start, state.end, state.depth, state.excludeAds, state.keywords.join('|'), state.rivals.join('|'), state.words.pos, state.words.neg, state.words.neutral].join('@');
-  const apiBase = () => (location.port === '8787' || location.hostname === '127.0.0.1' ? '' : COLLECTOR);
-  const nf = n => n.toLocaleString('ko-KR');
 
-  async function apiGet(path, params) {
-    const u = new URL(apiBase() + path, location.origin);
-    Object.entries(params || {}).forEach(([k, v]) => u.searchParams.set(k, v));
-    const r = await fetch(u, { cache: 'no-store' });
-    const j = await r.json().catch(() => ({ error: 'BAD_JSON' }));
-    if (!r.ok) throw Object.assign(new Error(j.error || r.status), { payload: j });
-    return j;
-  }
-  async function pingCollector() {
-    try {
-      const j = await apiGet('/api/ping');
-      trend.status = j.keys ? 'ready' : 'nokeys';
-    } catch (e) { trend.status = 'off'; }
-    if (state.tab === 'trend') render();
-  }
-  // 집계용 검색어는 화면과 같은 규칙(완전일치·협찬 제외)을 쓰되 사이트 전용 연산자는 뺀다
-  const countQuery = (kw, extra) => {
-    const parts = [state.depth === 'all' ? kw : `"${kw.replace(/"/g, '')}"`];
-    if (state.depth === 'deep' && !extra) { const g = words('neutral').join('|'); if (g) parts.push(g); }
-    if (extra) parts.push(extra);
-    if (state.excludeAds) parts.push(...ADS.map(w => '-' + w));
-    return parts.join(' ');
-  };
-  async function runTrend() {
-    if (trend.running) return;
-    const brands = [...state.keywords.map(k => [k, '자사']), ...state.rivals.map(k => [k, '경쟁사'])];
-    if (!brands.length) return;
-    trend.running = true; trend.error = ''; render();
-    const rows = [];
-    try {
-      for (const [kw, tag] of brands) {
-        const res = await apiGet('/api/counts', { q: countQuery(kw), start: state.start, end: state.end, sources: 'blog,news' });
-        const blog = res.sources.find(s => s.source === 'blog') || {};
-        const news = res.sources.find(s => s.source === 'news') || {};
-        const row = {
-          kw, tag, blog: blog.inRange || 0, news: news.inRange || 0,
-          total: (blog.inRange || 0) + (news.inRange || 0),
-          daily: blog.daily || {}, truncated: !!(blog.truncated || news.truncated),
-          samples: blog.samples || [], pos: null, neg: null,
-        };
-        for (const key of ['pos', 'neg']) {
-          const g = words(key).join('|');
-          if (!g) continue;
-          const t = await apiGet('/api/counts', { q: countQuery(kw, g), start: state.start, end: state.end, sources: 'blog' });
-          row[key] = (t.sources[0] || {}).inRange || 0;
-        }
-        rows.push(row);
-      }
-      trend.rows = rows;
-      trend.sig = trendSig();
-      trend.at = new Date().toLocaleTimeString('ko-KR');
-    } catch (e) {
-      trend.error = e.payload && e.payload.message ? e.payload.message : String(e.message || e);
-      if (String(e.message) === 'NO_KEYS') trend.status = 'nokeys';
-    }
-    trend.running = false; render();
-  }
-  function barsHtml(rows) {
-    const max = Math.max(1, ...rows.map(r => r.total));
-    return `<div class="bars">${rows.map(r => `<div class="barrow" title="${esc(r.kw)} · 블로그 ${nf(r.blog)} · 뉴스 ${nf(r.news)}">
-      <span class="blab">${esc(r.kw)}</span>
-      <span class="btrack"><i style="width:${(r.total / max * 100).toFixed(1)}%;background:${r.tag === '자사' ? series(1) : series(0)}"></i></span>
-      <b class="bval">${nf(r.total)}</b>
-    </div>`).join('')}</div>
-    <div class="vlegend"><span class="lg"><i style="background:${series(1)}"></i>자사</span><span class="lg"><i style="background:${series(0)}"></i>경쟁사</span></div>`;
-  }
-  function lineHtml(rows) {
-    const days = [];
-    for (let d = state.start; d <= state.end; d = addDays(d, 1)) days.push(d);
-    if (days.length < 3) return '';
-    const shown = rows.slice(0, 8);
-    const max = Math.max(1, ...shown.flatMap(r => days.map(d => r.daily[d] || 0)));
-    const W = 760, H = 210, L = 38, R = 12, T = 12, B = 26;
-    const x = i => L + (days.length === 1 ? 0 : i * (W - L - R) / (days.length - 1));
-    const y = v => T + (H - T - B) * (1 - v / max);
-    const ticks = [0, Math.round(max / 2), max].filter((v, i, a) => a.indexOf(v) === i);
-    return `<figure class="chart">
-      <figcaption>날짜별 네이버 블로그 글 수</figcaption>
-      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="날짜별 블로그 글 수 추이" preserveAspectRatio="none">
-        ${ticks.map(v => `<g><line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="grid"/><text x="${L - 7}" y="${y(v) + 4}" class="ax" text-anchor="end">${v}</text></g>`).join('')}
-        ${days.map((d, i) => (i === 0 || i === days.length - 1 || (days.length <= 10) || i % Math.ceil(days.length / 7) === 0)
-          ? `<text x="${x(i)}" y="${H - 8}" class="ax" text-anchor="middle">${d.slice(5).replace('-', '/')}</text>` : '').join('')}
-        ${shown.map((r, si) => {
-          const pts = days.map((d, i) => `${x(i)},${y(r.daily[d] || 0)}`).join(' ');
-          return `<polyline points="${pts}" fill="none" stroke="${series(si)}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-            ${days.map((d, i) => `<circle cx="${x(i)}" cy="${y(r.daily[d] || 0)}" r="3.5" fill="${series(si)}" stroke="var(--surface)" stroke-width="2"><title>${esc(r.kw)} · ${d} · ${nf(r.daily[d] || 0)}건</title></circle>`).join('')}`;
-        }).join('')}
-      </svg>
-      <div class="vlegend">${shown.map((r, si) => `<span class="lg"><i style="background:${series(si)}"></i>${esc(r.kw)}</span>`).join('')}</div>
-    </figure>`;
-  }
-  function trendCsv(rows) {
-    const head = [['브랜드', '구분', '블로그', '뉴스', '합계', '긍정', '부정']];
-    const body = rows.map(r => [r.kw, r.tag, r.blog, r.news, r.total, r.pos ?? '', r.neg ?? '']);
-    return '﻿' + [...head, ...body].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-  }
-  function viewTrend() {
-    const guide = `<section class="card card-pad">
-      <h3 style="margin:0 0 6px">집계 서버를 켜면 숫자가 나옵니다</h3>
-      <p class="hint" style="margin:0 0 10px">네이버 검색 API(무료·하루 25,000회)로 블로그·뉴스 글 수를 직접 셉니다. API 키는 내 PC에만 저장됩니다.</p>
-      <ol class="guide">
-        <li><b>Desktop\\sns-monitor\\collector</b> 폴더의 <b>README.md</b>를 보고 네이버 Client ID·Secret을 받아 <b>config.json</b>에 넣습니다.</li>
-        <li>같은 폴더의 <b>집계서버 켜기.bat</b>을 더블클릭합니다.</li>
-        <li><a href="${COLLECTOR}/#trend">http://127.0.0.1:8787/#trend</a> 로 들어옵니다. <b>이 주소에서만</b> 집계가 동작합니다.</li>
-      </ol>
-    </section>`;
-    if (trend.status === 'off') return summaryHtml() + `<div class="empty"><b>집계 서버가 꺼져 있어요.</b>
-      <p>지금 주소에서는 검색 링크만 쓸 수 있습니다. 아래 순서대로 서버를 켜고 127.0.0.1:8787 로 들어와 주세요.</p></div>` + guide;
-    if (trend.status === 'nokeys') return summaryHtml() + `<div class="empty"><b>서버는 켜졌는데 네이버 API 키가 없어요.</b>
-      <p>collector 폴더의 config.json 에 Client ID·Secret 을 넣고 서버를 다시 켜 주세요.</p></div>` + guide;
-    if (trend.status === 'unknown') return summaryHtml() + `<div class="empty"><b>집계 서버를 찾는 중…</b></div>`;
-
-    const stale = trend.rows && trend.sig !== trendSig();
-    const rows = stale ? null : trend.rows;
-    const head = `<section class="card">
-      <div class="chead static">
-        <span class="gicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19h16M7 19V9M12 19V5M17 19v-7"/></svg></span>
-        <span class="chead-text"><h3>네이버 언급량</h3><span class="gsub">블로그·뉴스 · ${esc(rangeLabel())} · ${DEPTHS[state.depth].label}${state.excludeAds ? ' · 협찬 제외' : ''}</span></span>
-        <span class="gcount">${trend.at ? '집계 ' + esc(trend.at) : ''}</span>
-      </div>
-      <div class="card-pad" style="padding-top:0">
-        <div class="report-actions">
-          <button class="btn" type="button" id="runTrend"${trend.running ? ' disabled' : ''}>${trend.running ? '세는 중…' : (rows ? '다시 집계' : '집계 시작')}</button>
-          ${rows ? '<button class="btn ghost" type="button" id="trendCsv">.csv로 내려받기</button>' : ''}
-        </div>
-        ${trend.error ? `<p class="note" style="margin-top:10px">집계 중 문제가 생겼어요 — ${esc(trend.error)}</p>` : ''}
-        ${stale ? '<p class="note" style="margin-top:10px">조건이 바뀌었어요. 다시 집계해 주세요.</p>' : ''}
-        <p class="hint" style="margin-top:10px">브랜드 ${state.keywords.length + state.rivals.length}개 × (블로그·뉴스·긍정·부정)을 차례로 셉니다. 브랜드가 많으면 20~30초 걸릴 수 있어요.</p>
-      </div>
-    </section>`;
-    if (!rows) return summaryHtml() + head;
-
-    const truncated = rows.some(r => r.truncated);
-    return summaryHtml() + head + `<section class="card">
-      <div class="chead static">
-        <span class="gicon">${SVG_SEARCH}</span>
-        <span class="chead-text"><h3>브랜드별 언급량</h3><span class="gsub">기간 안에 올라온 네이버 블로그 + 뉴스 글 수</span></span>
-      </div>
-      <div class="card-pad" style="padding-top:0">${barsHtml(rows)}${lineHtml(rows)}</div>
-      <div class="matrix"><table>
-        <thead><tr><th style="text-align:left">브랜드</th><th>구분</th><th>블로그</th><th>뉴스</th><th>합계</th><th>긍정어 동반</th><th>부정어 동반</th><th>부정 비율</th></tr></thead>
-        <tbody>${rows.map(r => `<tr>
-          <th><span class="brandcell">${esc(r.kw)}${r.truncated ? '<span class="badge approx">1,000건까지만 셈</span>' : ''}</span></th>
-          <td><span class="badge ${r.tag === '자사' ? 'mine' : 'rival'}">${r.tag}</span></td>
-          <td>${nf(r.blog)}</td><td>${nf(r.news)}</td><td><b>${nf(r.total)}</b></td>
-          <td>${r.pos == null ? '-' : nf(r.pos)}</td><td>${r.neg == null ? '-' : nf(r.neg)}</td>
-          <td>${r.blog && r.neg != null ? (r.neg / r.blog * 100).toFixed(1) + '%' : '-'}</td>
-        </tr>`).join('')}</tbody>
-      </table></div>
-      <div class="card-pad" style="padding-top:0">
-        <p class="hint">${truncated ? '‘1,000건까지만 셈’이 붙은 브랜드는 네이버 API가 한 번에 주는 최대치에 걸린 겁니다. 실제 글은 더 많아요 — 기간을 좁혀 보세요. ' : ''}긍정·부정은 그 단어가 글에 같이 들어간 블로그 글 수라서, 문장의 실제 뜻과는 다를 수 있습니다. 급증·급감을 잡는 신호로 쓰세요.</p>
-      </div>
-    </section>` + (rows[0] && rows[0].samples.length ? `<section class="card">
-      <div class="chead static"><span class="gicon">${SVG_SEARCH}</span>
-        <span class="chead-text"><h3>최근 글 맛보기</h3><span class="gsub">${esc(rows[0].kw)} · 네이버 블로그</span></span></div>
-      <div class="steps">${rows[0].samples.map(s => `<a class="step" href="${esc(s.link)}" target="_blank" rel="noopener noreferrer">
-        <span class="no">${esc(s.date.slice(8))}</span><span><b>${esc(s.title)}</b></span><span class="go">${SVG_ARROW}</span></a>`).join('')}</div>
-    </section>` : '');
-  }
-
-  function download(name, text, type) {
-    const blob = new Blob([text], { type: type || 'text/plain;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }
 
   function tipsHtml() {
     return `<section class="card tips">
@@ -1098,12 +897,12 @@
         <li><b>한 번 연 칸은 체크 표시가 남아요.</b> 기간이나 조건을 바꾸면 초기화돼서, 오늘 어디까지 봤는지 바로 알 수 있어요.</li>
         <li><b>인스타그램은 날짜로 검색할 수 없어요.</b> #태그 링크로 최신 글을 보거나 ‘인스타 (구글 경유)’를 쓰세요.</li>
         <li><b>X·인스타그램·스레드·틱톡은 로그인해야</b> 결과가 제대로 보여요.</li>
-        <li><b>이 페이지는 검색을 모아 줄 뿐, 글 수를 세지는 않아요.</b> 언급량 집계는 수집 서버가 있어야 가능합니다.</li>
+        <li><b>이 페이지는 검색을 모아 줄 뿐, 글 수를 세지는 않아요.</b> 건수를 집계하려면 유료 서비스나 API 키가 필요해서 넣지 않았습니다.</li>
       </ul>
     </section>`;
   }
 
-  const VIEWS = { dash: viewDash, radar: viewRadar, keywords: viewKeywords, rivals: viewRivals, trend: viewTrend };
+  const VIEWS = { radar: viewRadar, dash: viewDash, keywords: viewKeywords, rivals: viewRivals };
   function render() {
     syncSeen();
     if (!state.keywords.length) state.view = null;
@@ -1268,10 +1067,6 @@
       }
     }
   });
-  $('#main').addEventListener('click', e => {
-    if (e.target.closest('#runTrend')) runTrend();
-    if (e.target.closest('#trendCsv') && trend.rows) download(`언급량_${ymd(state.start)}-${ymd(state.end)}.csv`, trendCsv(trend.rows), 'text/csv;charset=utf-8');
-  });
   $('#copyAll').addEventListener('click', e => {
     copyText([copyHeader(), ...state.keywords.map(copyBlock), ...state.rivals.map(copyBlock)].join('\n\n'), e.currentTarget);
   });
@@ -1289,7 +1084,6 @@
   });
 
   render();
-  pingCollector();
 })();
 </script>
 </body>
