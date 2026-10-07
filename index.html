@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>브랜드 인사이트 · SNS 후기 레이더</title>
-<meta name="description" content="날짜와 키워드로 네이버·다음·인스타그램·X·유튜브 후기 검색을 한 번에 모아 보는 브랜드/경쟁사 모니터링 허브">
+<meta name="description" content="날짜와 키워드로 네이버·다음·인스타그램·X·유튜브 후기 검색을 한 번에 모아 보는 브랜드 후기 모니터링 허브">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
@@ -125,7 +125,6 @@
   .kw-add { display: flex; gap: 6px; margin: 0; }
   .kw-list { display: flex; flex-wrap: wrap; gap: 6px; }
   .kw { display: inline-flex; align-items: center; gap: 2px; background: var(--accent-soft); color: var(--ink); border-radius: 999px; padding: 3px 4px 3px 12px; font-weight: 500; font-size: .9rem; }
-  .kw.rival { background: var(--sunk); }
   .kw button { border: 0; background: transparent; color: var(--muted); font-size: 1.05rem; line-height: 1; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; }
   .kw button:hover { color: var(--neg); }
 
@@ -196,8 +195,6 @@
   .badge.exact { background: var(--pos-soft); color: var(--pos); }
   .badge.approx { background: var(--warn-soft); color: var(--warn); }
   .badge.none { background: var(--sunk); color: var(--muted); }
-  .badge.mine { background: var(--accent-soft); color: var(--accent); }
-  .badge.rival { background: var(--sunk); color: var(--muted); }
   .tick { position: absolute; top: 7px; right: 8px; color: var(--pos); opacity: 0; }
   .tick svg { width: 15px; height: 15px; }
   .tile.done .tick { opacity: 1; }
@@ -238,7 +235,7 @@
   .step .go { margin-left: auto; color: var(--muted); flex: none; }
   .step .go svg { width: 16px; height: 16px; }
 
-  /* 경쟁사 매트릭스 */
+  /* 표 (키워드 분석 교차표) */
   .matrix { overflow: auto; padding: 0 18px 18px; }
   table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 620px; font-size: .88rem; }
   th, td { padding: 7px 8px; text-align: center; border-bottom: 1px solid var(--line); }
@@ -246,12 +243,10 @@
   thead th .mk { margin: 0 auto 4px; }
   tbody th { text-align: left; position: sticky; left: 0; background: var(--surface); font-weight: 700; white-space: nowrap; z-index: 1; }
   tbody tr:hover th, tbody tr:hover td { background: var(--seen); }
-  .brandcell { display: flex; align-items: center; gap: 8px; }
   .cell a { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--line); color: var(--muted); background: var(--surface); }
   .cell a:hover { border-color: var(--brand); color: var(--brand); }
   .cell a.done { background: var(--pos-soft); border-color: transparent; color: var(--pos); }
   .cell a svg { width: 15px; height: 15px; }
-  .rowact { display: flex; gap: 5px; justify-content: flex-end; }
   .mini { font-size: .76rem; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); text-decoration: none; color: var(--ink); background: var(--surface); white-space: nowrap; }
   .mini.pos { background: var(--pos-soft); color: var(--pos); border-color: transparent; }
   .mini.neg { background: var(--neg-soft); color: var(--neg); border-color: transparent; }
@@ -286,7 +281,6 @@
       <button type="button" data-tab="radar">SNS 후기 레이더</button>
       <button type="button" data-tab="dash">대시보드</button>
       <button type="button" data-tab="keywords">키워드 분석</button>
-      <button type="button" data-tab="rivals">경쟁사 모니터링</button>
     </nav>
     <div class="nav-right">
       <button class="icon-btn" type="button" id="themeBtn" aria-label="밝게/어둡게 바꾸기" title="밝게/어둡게 바꾸기">
@@ -333,22 +327,12 @@
       </section>
 
       <section>
-        <h2 class="field-label"><label for="kwInput">자사 키워드</label><span class="tip-mark" title="우리 브랜드·메뉴 이름. 쉼표로 여러 개를 한 번에 넣을 수 있어요.">?</span></h2>
+        <h2 class="field-label"><label for="kwInput">키워드</label><span class="tip-mark" title="우리 브랜드·메뉴 이름. 쉼표로 여러 개를 한 번에 넣을 수 있어요.">?</span></h2>
         <form class="kw-add" id="kwForm">
           <input type="text" id="kwInput" placeholder="예: 한강엽떡" autocomplete="off" enterkeyhint="done">
           <button class="btn" type="submit">추가</button>
         </form>
         <div class="kw-list" id="kwList"></div>
-      </section>
-
-      <section>
-        <h2 class="field-label"><label for="rvInput">경쟁사</label><span class="tip-mark" title="같은 조건으로 나란히 비교할 경쟁 브랜드입니다.">?</span></h2>
-        <form class="kw-add" id="rvForm">
-          <input type="text" id="rvInput" placeholder="예: 신전떡볶이" autocomplete="off" enterkeyhint="done">
-          <button class="btn ghost" type="submit">추가</button>
-        </form>
-        <div class="kw-list" id="rvList"></div>
-        <p class="hint"><button class="mini" type="button" id="rvReset">기본 경쟁사 목록 되돌리기</button></p>
       </section>
 
       <section>
@@ -509,13 +493,10 @@
   const REACT_TARGETS = ['nblog', 'ncafe', 'dblog', 'x', 'community', 'google', 'youtube'];
   const ADS = ['협찬', '원고료', '제공받아', '체험단'];
   const ALL = '__all__';
-  const RIVAL_PRESET = ['신전떡볶이', '죠스떡볶이', '국대떡볶이', '청년다방', '두끼떡볶이', '배떡', '응급실떡볶이', '삼첩분식'];
-  const RIVAL_CHANNELS = ['nblog', 'ncafe', 'insta', 'instag', 'youtube', 'community', 'google'];
   const TABS = {
     dash: { title: '브랜드 <span class="mark">대시보드</span>', lede: '오늘 무엇을 어디까지 확인했는지 한눈에 봅니다. 아래 순서대로만 돌면 하루치 모니터링이 끝납니다.' },
     radar: { title: 'SNS 후기 <span class="mark">레이더</span>', lede: '날짜와 키워드를 넣으면 네이버·다음·인스타그램·X·유튜브 검색 결과를 한 번에 모아 볼 수 있습니다. 서버도 API 키도 쓰지 않습니다.' },
     keywords: { title: '키워드 <span class="mark">분석</span>', lede: '같은 키워드를 반응어·관점별로 쪼개서, 소비자가 무엇을 좋아하고 무엇에 불만인지 갈라서 봅니다.' },
-    rivals: { title: '경쟁사 <span class="mark">모니터링</span>', lede: '자사 브랜드와 경쟁 브랜드를 같은 기간·같은 채널 조건으로 나란히 놓고 확인합니다.' },
   };
 
   // 상태 (키워드·옵션은 이 브라우저에 저장, 날짜는 매번 오늘로 시작)
@@ -524,7 +505,6 @@
   const DROPPED = ['밤티엽떡']; // 자사 브랜드가 아니라 유행어라서 뺌
   const DEFAULTS = {
     keywords: ['엽기떡볶이', '한강엽떡'],
-    rivals: RIVAL_PRESET.slice(0, 6),
     tab: 'radar',
     sort: 'relevance',
     depth: 'focus',
@@ -559,7 +539,6 @@
           const kept = s.keywords.filter(k => !DROPPED.includes(k));
           if (kept.length) base.keywords = kept;
         }
-        if (Array.isArray(s.rivals) && s.rivals.length) base.rivals = s.rivals;
         if (s.words) base.words = { ...base.words, ...s.words };
         if (Array.isArray(s.hidden)) base.hidden = s.hidden;
         if (typeof s.excludeAds === 'boolean') base.excludeAds = s.excludeAds;
@@ -571,8 +550,8 @@
   }
   function save() {
     try {
-      const { keywords, rivals, tab, sort, depth, excludeAds, reactTarget, hidden, view, collapsed, seen, words } = state;
-      localStorage.setItem(STORE, JSON.stringify({ keywords, rivals, tab, sort, depth, excludeAds, reactTarget, hidden, view, collapsed, seen, words }));
+      const { keywords, tab, sort, depth, excludeAds, reactTarget, hidden, view, collapsed, seen, words } = state;
+      localStorage.setItem(STORE, JSON.stringify({ keywords, tab, sort, depth, excludeAds, reactTarget, hidden, view, collapsed, seen, words }));
     } catch (e) { /* 무시 */ }
   }
   const state = load();
@@ -588,7 +567,6 @@
   const rangeLabel = () => state.start === state.end ? dayLabel(state.start) : `${dayLabel(state.start)} ~ ${dayLabel(state.end)}`;
   const sortLabel = () => state.sort === 'relevance' ? '관련도순' : '최신순';
   const rangeKey = () => `${state.start}~${state.end}|${state.sort}|${state.depth}`;
-  const rivalChannels = () => RIVAL_CHANNELS.map(byId).filter(p => !state.hidden.includes(p.id));
 
   // 검색어 만들기 — 글 깊이에 따라 완전일치·제목·후기어를 더한다
   function orGroup(ws, syntax) {
@@ -646,8 +624,6 @@
     document.querySelectorAll('#presets .pill').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.preset === ap)));
     $('#kwList').innerHTML = state.keywords.map((k, i) =>
       `<span class="kw">${esc(k)}<button type="button" data-remove="${i}" aria-label="${esc(k)} 삭제">×</button></span>`).join('');
-    $('#rvList').innerHTML = state.rivals.map((k, i) =>
-      `<span class="kw rival">${esc(k)}<button type="button" data-rremove="${i}" aria-label="${esc(k)} 삭제">×</button></span>`).join('');
     document.querySelectorAll('#sortSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sort === state.sort)));
     document.querySelectorAll('#depthSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.depth === state.depth)));
     $('#sortNote').textContent = SORT_NOTE[state.sort];
@@ -737,7 +713,7 @@
   function viewRadar() {
     const vis = visible();
     const target = byId(state.reactTarget) || PLATFORMS[0];
-    if (!state.keywords.length) return summaryHtml() + `<div class="empty"><b>아직 키워드가 없어요.</b><p>왼쪽 ‘자사 키워드’ 칸에 브랜드나 메뉴 이름을 넣으면 채널별 검색 링크가 여기에 만들어져요.</p></div>`;
+    if (!state.keywords.length) return summaryHtml() + `<div class="empty"><b>아직 키워드가 없어요.</b><p>왼쪽 ‘키워드’ 칸에 브랜드나 메뉴 이름을 넣으면 채널별 검색 링크가 여기에 만들어져요.</p></div>`;
     const list = state.view === ALL ? state.keywords : [state.view];
     const blocks = list.map(kw => {
       const groups = GROUPS.map(g => {
@@ -753,7 +729,7 @@
   }
 
   function viewKeywords() {
-    if (!state.keywords.length) return summaryHtml() + `<div class="empty"><b>아직 키워드가 없어요.</b><p>왼쪽 ‘자사 키워드’ 칸에 브랜드나 메뉴 이름을 먼저 넣어 주세요.</p></div>`;
+    if (!state.keywords.length) return summaryHtml() + `<div class="empty"><b>아직 키워드가 없어요.</b><p>왼쪽 ‘키워드’ 칸에 브랜드나 메뉴 이름을 먼저 넣어 주세요.</p></div>`;
     const target = byId(state.reactTarget) || PLATFORMS[0];
     const list = state.view === ALL ? state.keywords : [state.view];
     const blocks = list.map(kw => {
@@ -789,46 +765,6 @@
     return summaryHtml(`키워드 ${state.keywords.length}개`) + kwTabsHtml() + blocks;
   }
 
-  function viewRivals() {
-    const chans = rivalChannels();
-    const rows = [...state.keywords.map(k => [k, true]), ...state.rivals.map(k => [k, false])];
-    if (!rows.length) return summaryHtml() + `<div class="empty"><b>비교할 브랜드가 없어요.</b><p>왼쪽에서 자사 키워드와 경쟁사를 넣어 주세요.</p></div>`;
-    if (!chans.length) return summaryHtml() + `<div class="empty"><b>켜진 비교 채널이 없어요.</b><p>왼쪽 ‘채널 켜고 끄기’에서 네이버 블로그·카페, 인스타그램, 유튜브, 커뮤니티를 켜 주세요.</p></div>`;
-    const target = byId(state.reactTarget) || PLATFORMS[0];
-    const table = `<section class="card">
-      <div class="chead static">
-        <span class="gicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19h16M7 19V9M12 19V5M17 19v-7"/></svg></span>
-        <span class="chead-text"><h3>브랜드 × 채널 비교</h3><span class="gsub">같은 기간·같은 조건. 칸을 누르면 그 브랜드의 해당 채널 검색이 열립니다</span></span>
-        <span class="gcount">${rows.length}개 브랜드 · ${chans.length}개 채널</span>
-      </div>
-      <div class="matrix"><table>
-        <thead><tr><th style="text-align:left">브랜드</th>${chans.map(p => `<th>${icon(p.id, 'sm')}${esc(p.name.replace(/ \(.*\)$/, '').replace('인스타그램 ', '인스타 '))}</th>`).join('')}<th>반응</th></tr></thead>
-        <tbody>${rows.map(([kw, mine]) => `<tr>
-          <th><span class="brandcell">${esc(kw)}<span class="badge ${mine ? 'mine' : 'rival'}">${mine ? '자사' : '경쟁'}</span></span></th>
-          ${chans.map(p => `<td class="cell"><a href="${esc(linkFor(kw, p))}" target="_blank" rel="noopener noreferrer" class="${isSeen(kw, p.id) ? 'done' : ''}" data-seen="${esc(seenId(kw, p.id))}" title="${esc(`${kw} · ${p.name}`)}">${SVG_SEARCH}</a></td>`).join('')}
-          <td><span class="rowact">
-            <a class="mini pos" href="${esc(linkFor(kw, target, orGroup(words('pos'), target.syntax)))}" target="_blank" rel="noopener noreferrer">긍정</a>
-            <a class="mini neg" href="${esc(linkFor(kw, target, orGroup(words('neg'), target.syntax)))}" target="_blank" rel="noopener noreferrer">부정</a>
-          </span></td>
-        </tr>`).join('')}</tbody>
-      </table></div>
-    </section>`;
-    const vs = state.keywords.length && state.rivals.length ? `<section class="card">
-      <div class="chead static">
-        <span class="gicon">${SVG_SEARCH}</span>
-        <span class="chead-text"><h3>맞비교 검색</h3><span class="gsub">자사 ‘${esc(state.keywords[0])}’와 경쟁사를 한 검색어에 같이 넣어, 둘을 함께 언급한 글만 찾습니다</span></span>
-      </div>
-      <div class="tiles">${state.rivals.map(rv => {
-        const p = state.hidden.includes('nblog') ? chans[0] : byId('nblog');
-        const q = `${state.keywords[0]} ${rv}`;
-        return `<a class="tile${isSeen(q, p.id) ? ' done' : ''}" href="${esc(p.url(state.depth === 'all' ? q : `"${state.keywords[0]}" "${rv}"`, ctx(), q))}" target="_blank" rel="noopener noreferrer" data-seen="${esc(seenId(q, p.id))}">
-          ${p.icon}<span class="tbody"><span class="tname">vs ${esc(rv)}</span><span class="badge ${p.date}">${DATE_BADGE[p.date][0]}</span></span>
-          <span class="tick" aria-hidden="true">${SVG_CHECK}</span></a>`;
-      }).join('')}</div>
-    </section>` : '';
-    return summaryHtml(`브랜드 ${rows.length}개`) + table + vs;
-  }
-
   function dashSteps() {
     const steps = [];
     const kw = state.keywords[0];
@@ -838,13 +774,12 @@
       steps.push({ title, desc, href: linkFor(kwv, p, extra), id: seenId(kwv, p.id, extra) });
     };
     if (kw) {
-      add('자사 브랜드 새 후기 확인', `${kw} · 네이버 블로그`, kw, 'nblog');
+      add('새 후기 확인', `${kw} · 네이버 블로그`, kw, 'nblog');
       add('카페·커뮤니티 반응 확인', `${kw} · 네이버 카페`, kw, 'ncafe');
       add('인스타그램 태그 확인', `${kw} · 해시태그 최신글`, kw, 'insta');
       const t = byId(state.reactTarget) || byId('nblog');
       if (t) steps.push({ title: '부정 반응 점검', desc: `${kw} + ${words('neg').join('·')} · ${t.name}`, href: linkFor(kw, t, orGroup(words('neg'), t.syntax)), id: seenId(kw, t.id, 'NEG') });
     }
-    if (state.rivals[0]) add('경쟁사 동향 확인', `${state.rivals[0]} · 네이버 블로그`, state.rivals[0], 'nblog');
     return steps;
   }
   function viewDash() {
@@ -864,14 +799,12 @@
         <span><b>${esc(s.title)}</b><span class="sdesc"> ${esc(s.desc)}</span></span>
         <span class="go">${SVG_ARROW}</span>
       </a>`).join('')}</div>
-    </section>` : `<div class="empty"><b>아직 키워드가 없어요.</b><p>왼쪽에서 자사 키워드를 넣으면 오늘 할 점검 순서가 만들어져요.</p></div>`;
+    </section>` : `<div class="empty"><b>아직 키워드가 없어요.</b><p>왼쪽에서 키워드를 넣으면 오늘 할 점검 순서가 만들어져요.</p></div>`;
     return summaryHtml() + `<div class="stats">
       <div class="card stat"><span class="lbl">오늘 확인 진행</span><span class="num">${pct}<small>%</small></span>
         <span class="sub">${done} / ${total}칸 확인 · 기간을 바꾸면 초기화돼요</span><span class="bar"><i style="width:${pct}%"></i></span></div>
-      <div class="card stat"><span class="lbl">자사 키워드</span><span class="num">${state.keywords.length}<small>개</small></span>
+      <div class="card stat"><span class="lbl">키워드</span><span class="num">${state.keywords.length}<small>개</small></span>
         <span class="sub">${esc(state.keywords.join(', ')) || '없음'}</span></div>
-      <div class="card stat"><span class="lbl">경쟁사</span><span class="num">${state.rivals.length}<small>개</small></span>
-        <span class="sub">${esc(state.rivals.join(', ')) || '없음'}</span></div>
       <div class="card stat"><span class="lbl">검색 채널</span><span class="num">${vis.length}<small>곳</small></span>
         <span class="sub">${sortLabel()} · ${DEPTHS[state.depth].label}</span></div>
     </div>` + stepsHtml + `<section class="card tips">
@@ -879,7 +812,6 @@
       <div class="chips">
         <button class="chip" type="button" data-go="radar">SNS 후기 레이더 열기</button>
         <button class="chip" type="button" data-go="keywords">키워드 분석 열기</button>
-        <button class="chip" type="button" data-go="rivals">경쟁사 모니터링 열기</button>
       </div>
     </section>`;
   }
@@ -902,13 +834,13 @@
     </section>`;
   }
 
-  const VIEWS = { radar: viewRadar, dash: viewDash, keywords: viewKeywords, rivals: viewRivals };
+  const VIEWS = { radar: viewRadar, dash: viewDash, keywords: viewKeywords };
   function render() {
     syncSeen();
     if (!state.keywords.length) state.view = null;
     else if (state.view !== ALL && !state.keywords.includes(state.view)) state.view = state.keywords[0];
     renderPanel();
-    $('#copyAll').hidden = !(state.keywords.length || state.rivals.length);
+    $('#copyAll').hidden = !state.keywords.length;
     $('#main').innerHTML = VIEWS[state.tab]();
   }
 
@@ -978,25 +910,12 @@
     if (parts.length && state.view !== ALL) state.view = parts[0];
     input.value = ''; save(); render(); $('#kwInput').focus();
   });
-  $('#rvForm').addEventListener('submit', e => {
-    e.preventDefault();
-    const input = $('#rvInput');
-    for (const k of splitInput(input.value)) if (!state.rivals.includes(k)) state.rivals.push(k);
-    input.value = ''; save(); render(); $('#rvInput').focus();
-  });
   $('#kwList').addEventListener('click', e => {
     const b = e.target.closest('[data-remove]');
     if (!b) return;
     state.keywords.splice(Number(b.dataset.remove), 1);
     save(); render();
   });
-  $('#rvList').addEventListener('click', e => {
-    const b = e.target.closest('[data-rremove]');
-    if (!b) return;
-    state.rivals.splice(Number(b.dataset.rremove), 1);
-    save(); render();
-  });
-  $('#rvReset').addEventListener('click', () => { state.rivals = RIVAL_PRESET.slice(); save(); render(); });
   $('#sortSeg').addEventListener('click', e => {
     const b = e.target.closest('[data-sort]'); if (!b) return;
     state.sort = b.dataset.sort; save(); render();
@@ -1027,8 +946,7 @@
     if (go) { setTab(go.dataset.go); return; }
     const cv = e.target.closest('[data-copyview]');
     if (cv) {
-      const list = state.tab === 'rivals' ? [...state.keywords, ...state.rivals]
-        : (state.view === ALL || !state.view ? state.keywords : [state.view]);
+      const list = state.view === ALL || !state.view ? state.keywords : [state.view];
       copyText([copyHeader(), ...list.map(copyBlock)].join('\n\n'), cv);
       return;
     }
@@ -1068,7 +986,7 @@
     }
   });
   $('#copyAll').addEventListener('click', e => {
-    copyText([copyHeader(), ...state.keywords.map(copyBlock), ...state.rivals.map(copyBlock)].join('\n\n'), e.currentTarget);
+    copyText([copyHeader(), ...state.keywords.map(copyBlock)].join('\n\n'), e.currentTarget);
   });
   $('#sheetClose').addEventListener('click', () => { $('#sheet').hidden = true; });
 
